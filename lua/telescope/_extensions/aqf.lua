@@ -9,6 +9,7 @@ local finders = require("telescope.finders")
 local pickers = require("telescope.pickers")
 local sorters = require("telescope.sorters")
 local state = require("telescope.actions.state")
+local utils = require("telescope.actions.utils")
 local conf = require("telescope.config").values
 local plenary = require("plenary")
 local with = plenary.context_manager.with
@@ -60,7 +61,7 @@ local function by_name(opts)
     if not opts then
         opts = { fname_width = 200, path_display = { "absolute" } }
     end
-    local filtered_qf = vim.g.filtered_qf
+    local filtered_qf = vim.g.__aqf_file_lines
     local filtered_qf_str = ""
     for _, v in pairs(filtered_qf) do
         local filename = v:sub(1, v:find(":") - 1)
@@ -81,33 +82,100 @@ local function by_name(opts)
             return nil
         end
         local rg_args = split(prompt)
+        table.insert(rg_args, "")
         table.insert(rg_args, "/tmp/aqftmpfilenames")
         return rg_args
     end, opts.entry_maker or make_entry.gen_from_file(opts))
 
+    vim.g.__aqf_filter_by_name_results = nil
     pickers
         .new(opts, {
             prompt_title = "Filter quickfix by filename",
             finder = live_grepper,
-            -- sorter = sorters.get_generic_fuzzy_sorter(),
-            sorter = sorters.highlighter_only(opts),
+            sorter = sorters.get_generic_fuzzy_sorter(),
+            -- sorter = sorters.highlighter_only(opts),
             default_text = "rg -N -I --no-heading --no-column ",
-            -- attach_mappings = function(prompt_bufnr, _)
-            --     actions.select_default:replace(function()
-            --         actions.close(prompt_bufnr)
-            --
-            --         local selection = state.get_selected_entry()
-            --         local link = codes[selection[1]]
-            --
-            --         vim.fn.jobstart(http_opts.open_url:format(link))
-            --     end)
-            --     return true
-            -- end,
+            attach_mappings = function(prompt_bufnr, x)
+                vim.keymap.set("i", "<leader><cr>", function()
+                    local _ = state.get_current_picker(prompt_bufnr)
+                    local results = {}
+                    utils.map_entries(prompt_bufnr, function(entry, index, row)
+                        table.insert(results, entry.value)
+                    end)
+                    vim.g.__aqf_filter_by_name_results = results
+                end, { remap = true, buffer = prompt_bufnr })
+
+                return true
+            end,
         })
         :find()
 end
 
-local function by_file_content(opts) end
+local function _deduplicate(list)
+    local res = {}
+    local seen = {}
+    for i, v in pairs(list) do
+        if not seen[v] then
+            seen[v] = i
+            table.insert(res, v)
+        end
+    end
+    return res
+end
+
+local function _filenames_from_qf_lines(list)
+    local res = {}
+    for _, qf_line in pairs(list) do
+        local filename = qf_line:sub(1, qf_line:find(":") - 1)
+        table.insert(res, filename)
+    end
+    return res
+end
+
+local function by_file_content(opts)
+    if not opts then
+        opts = { fname_width = 200, path_display = { "absolute" } }
+    end
+
+    local live_grepper = finders.new_job(function(prompt)
+        if not prompt or prompt == "" then
+            return nil
+        end
+        local rg_args = split(prompt)
+
+        -- table.insert(rg_args, "")
+        local filenames = _filenames_from_qf_lines(vim.g.__aqf_file_lines)
+        local unique_filenames = _deduplicate(filenames)
+        for _, name in pairs(unique_filenames) do
+            table.insert(rg_args, name)
+        end
+
+        return rg_args
+    end, opts.entry_maker or make_entry.gen_from_vimgrep(opts))
+
+    vim.g.__aqf_filter_by_file_content_results = nil
+    pickers
+        .new(opts, {
+            prompt_title = "Filter quickfix by file content",
+            finder = live_grepper,
+            previewer = conf.grep_previewer(opts),
+            sorter = sorters.get_generic_fuzzy_sorter(),
+            default_text = "rg --vimgrep ",
+            attach_mappings = function(prompt_bufnr, x)
+                vim.keymap.set("i", "<leader><cr>", function()
+                    local _ = state.get_current_picker(prompt_bufnr)
+                    local results = {}
+                    utils.map_entries(prompt_bufnr, function(entry, index, row)
+                        table.insert(results, entry.value)
+                    end)
+                    vim.g.__aqf_filter_by_file_content_results = results
+                end, { remap = true, buffer = prompt_bufnr })
+
+                return true
+            end,
+        })
+        :find()
+end
 
 return telescope.register_extension({
     setup = function(opts, _)

@@ -1,5 +1,13 @@
 local M = { quit_after_apply = false, prev_qflists_limit = 3, win_height = 50, win_width = 180 }
 
+function table.copy(t)
+    local u = {}
+    for k, v in pairs(t) do
+        u[k] = v
+    end
+    return setmetatable(u, getmetatable(t))
+end
+
 --- @param opts table
 function M.setup(opts)
     local quit_after_apply = opts["quit_after_apply"]
@@ -19,9 +27,37 @@ function M.setup(opts)
         M.win_width = win_width
     end
     vim.g.prev_qflists = {}
+    vim.keymap.set("n", "<leader>P", M.show_saved_qf_lists, { noremap = true })
+    vim.keymap.set("n", "<leader>E", M.edit_curr_qf, { noremap = true })
+    vim.keymap.set("n", "<leader>S", M.show_saved_qf_lists, { noremap = true })
+    vim.keymap.set("n", "<leader>R", function()
+        vim.cmd([[
+Lazy reload aqf.nvim
+Lazy reload telescope.nvim
+Lazy reload aqf.nvim
+Lazy reload telescope.nvim
+    ]])
+    end, { noremap = true })
 end
 
-local function _filter_by_bufnames(list, query) end
+local function _filter_by_bufnames(file_list, names)
+    local res = {}
+    for i, v in pairs(file_list) do
+        local found = false
+        for _, name in pairs(names) do
+            -- vim.notify("Comparing " .. v.filename .. " and " .. name)
+            if v.filename == name then
+                found = true
+                break
+            end
+        end
+        if found then
+            res[i] = v
+        end
+    end
+    return res
+end
+
 local function _filter_by_bufcontent(list, query) end
 
 local function _cushion_to_center(text, width)
@@ -83,6 +119,84 @@ local function _get_cursor_pos()
     return curpos[2], curpos[3]
 end
 
+local function _save_qf_from_current_editing_window(bufnr, sep_line)
+    local buf_content = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local qflist = {}
+    local found_sep_line = false
+    for _, v in pairs(buf_content) do
+        if v:find(sep_line, nil, true) then
+            found_sep_line = true
+            goto continue
+        end
+        if not found_sep_line then
+            goto continue
+        end
+
+        table.insert(qflist, v)
+
+        ::continue::
+    end
+
+    M.save_qf()
+
+    local lnum, col = _get_cursor_pos()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, qflist)
+    vim.api.nvim_command("cexpr []")
+    vim.api.nvim_command("caddbuffer")
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buf_content)
+    -- FIXME: think of a better way to remove the last entry from undolist
+    vim.cmd.undo()
+    vim.fn.cursor(lnum, col)
+end
+
+local function _apply_filter_by_name_results_via_autocmd(aqf_bufnr, file_list, prefix_lines)
+    local prompt_bufnr = vim.api.nvim_get_current_buf()
+    vim.api.nvim_create_autocmd("BufLeave", {
+        buffer = prompt_bufnr,
+        group = vim.api.nvim_create_augroup("telescope-aqf", {}),
+        desc = "get selected entries from telescope aqf",
+        callback = function()
+            local names = vim.g.__aqf_filter_by_name_results
+            if not names then
+                return
+            end
+
+            local filtered = _filter_by_bufnames(file_list, names)
+            local new_lines = table.copy(prefix_lines)
+            local new_file_lines = _lineify_file_list(filtered, nil)
+            vim.g.__aqf_file_lines = new_file_lines
+            for _, v in pairs(new_file_lines) do
+                table.insert(new_lines, v)
+            end
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, {})
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 1, -1, false, new_lines)
+        end,
+    })
+end
+
+local function _apply_filter_by_file_content_results_via_autocmd(aqf_bufnr, prefix_lines)
+    local prompt_bufnr = vim.api.nvim_get_current_buf()
+    vim.api.nvim_create_autocmd("BufLeave", {
+        buffer = prompt_bufnr,
+        group = vim.api.nvim_create_augroup("telescope-aqf", {}),
+        desc = "get selected entries from telescope aqf",
+        callback = function()
+            local lines = vim.g.__aqf_filter_by_file_content_results
+            if not lines then
+                return
+            end
+
+            local new_lines = table.copy(prefix_lines)
+            vim.g.__aqf_file_lines = lines
+            for _, v in pairs(lines) do
+                table.insert(new_lines, v)
+            end
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, {})
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 1, -1, false, new_lines)
+        end,
+    })
+end
+
 local function _edit_qf(qf)
     local lines = {
         "<leader>n - filter by file names, <leader>c - filter by file content, <leader>s - filter by previous search query,",
@@ -100,8 +214,9 @@ local function _edit_qf(qf)
     table.insert(lines, sep_line)
 
     local file_list = _create_file_list(qf)
-    local file_lines = _lineify_file_list(file_list, nil)
-    for _, v in pairs(file_lines) do
+    vim.g.__aqf_file_lines = _lineify_file_list(file_list, nil)
+    local old_lines = table.copy(lines)
+    for _, v in pairs(vim.g.__aqf_file_lines) do
         table.insert(lines, v)
     end
 
@@ -110,38 +225,20 @@ local function _edit_qf(qf)
 
     vim.keymap.set("n", "<leader>n", function()
         local telescope = require("telescope")
-        vim.g.filtered_qf = file_lines
         telescope.extensions.aqf.by_name()
+        _apply_filter_by_name_results_via_autocmd(bufnr, file_list, old_lines)
     end, { noremap = true, buffer = bufnr })
+
+    vim.keymap.set("n", "<leader>c", function()
+        local telescope = require("telescope")
+        telescope.extensions.aqf.by_file_content()
+        _apply_filter_by_file_content_results_via_autocmd(bufnr, old_lines)
+    end, { noremap = true, buffer = bufnr })
+
     vim.keymap.set("n", "<leader>a", function()
-        local buf_content = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-        local qflist = {}
-        local found_sep_line = false
-        for _, v in pairs(buf_content) do
-            if v:find(sep_line, nil, true) then
-                found_sep_line = true
-                goto continue
-            end
-            if not found_sep_line then
-                goto continue
-            end
-
-            table.insert(qflist, v)
-
-            ::continue::
-        end
-
-        M.save_qf()
-
-        local lnum, col = _get_cursor_pos()
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, qflist)
-        vim.api.nvim_command("cexpr []")
-        vim.api.nvim_command("caddbuffer")
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buf_content)
-        -- FIXME: think of a better way to remove the last entry from undolist
-        vim.cmd.undo()
-        vim.fn.cursor(lnum, col)
+        _save_qf_from_current_editing_window(bufnr, sep_line)
     end, { buffer = bufnr, noremap = true })
+
     vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
 end
 
@@ -272,9 +369,5 @@ function M.show_saved_qf_lists()
     end, { noremap = true, buffer = bufnr })
     vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
 end
-
-vim.keymap.set("n", "<leader>P", M.show_saved_qf_lists, { noremap = true })
-vim.keymap.set("n", "<leader>E", M.edit_curr_qf, { noremap = true })
-vim.keymap.set("n", "<leader>S", M.show_saved_qf_lists, { noremap = true })
 
 return M
