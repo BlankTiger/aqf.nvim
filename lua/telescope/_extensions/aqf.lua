@@ -93,22 +93,19 @@ local function by_name(opts)
             prompt_title = "Filter quickfix by filename",
             finder = live_grepper,
             sorter = sorters.get_generic_fuzzy_sorter(),
-            -- sorter = sorters.highlighter_only(opts),
             default_text = "rg -N -I --no-heading --no-column ",
-            attach_mappings = function(prompt_bufnr, x)
-                vim.keymap.set("i", "<leader><cr>", function()
-                    local _ = state.get_current_picker(prompt_bufnr)
-                    local results = {}
-                    utils.map_entries(prompt_bufnr, function(entry, index, row)
-                        table.insert(results, entry.value)
-                    end)
-                    vim.g.__aqf_filter_by_name_results = results
-                end, { remap = true, buffer = prompt_bufnr })
-
-                return true
-            end,
         })
         :find()
+
+    local prompt_bufnr = vim.api.nvim_get_current_buf()
+    vim.keymap.set("i", "<cr>", function()
+        local results = {}
+        utils.map_entries(prompt_bufnr, function(entry, index, row)
+            table.insert(results, entry.value)
+        end)
+        vim.g.__aqf_filter_by_name_results = results
+        actions.close(prompt_bufnr)
+    end, { remap = true, buffer = prompt_bufnr })
 end
 
 local function _deduplicate(list)
@@ -161,20 +158,18 @@ local function by_file_content(opts)
             previewer = conf.grep_previewer(opts),
             sorter = sorters.get_generic_fuzzy_sorter(),
             default_text = "rg --vimgrep ",
-            attach_mappings = function(prompt_bufnr, x)
-                vim.keymap.set("i", "<leader><cr>", function()
-                    local _ = state.get_current_picker(prompt_bufnr)
-                    local results = {}
-                    utils.map_entries(prompt_bufnr, function(entry, index, row)
-                        table.insert(results, entry.value)
-                    end)
-                    vim.g.__aqf_filter_by_file_content_results = results
-                end, { remap = true, buffer = prompt_bufnr })
-
-                return true
-            end,
         })
         :find()
+
+    local prompt_bufnr = vim.api.nvim_get_current_buf()
+    vim.keymap.set("i", "<cr>", function()
+        local results = {}
+        utils.map_entries(prompt_bufnr, function(entry, index, row)
+            table.insert(results, entry.value)
+        end)
+        vim.g.__aqf_filter_by_file_content_results = results
+        actions.close(prompt_bufnr)
+    end, { remap = true, buffer = prompt_bufnr })
 end
 
 return telescope.register_extension({
