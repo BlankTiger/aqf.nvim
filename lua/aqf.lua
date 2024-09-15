@@ -242,10 +242,41 @@ local function _apply_filter_by_match_content_results_via_autocmd(
     })
 end
 
+function filter_qf_by_query(by_prev_search)
+    local query = ""
+    if by_prev_search then
+        vim.notify("Filtering using latest search pattern (/ reg)")
+        query = vim.fn.getreg("/")
+    else
+        query = vim.fn.input("Search pattern: ")
+    end
+
+    if query == "" then
+        vim.notify("No search pattern provided")
+        return
+    end
+
+    local curr_buf = vim.fn.bufnr()
+    local curr_qflist = vim.fn.getqflist()
+    local matching_files = {}
+    for _, v in ipairs(curr_qflist) do
+        local bufnr = v["bufnr"]
+        vim.api.nvim_command("buf " .. bufnr)
+        local search_res = vim.fn.search(query)
+        if search_res ~= 0 then
+            table.insert(matching_files, v)
+        end
+    end
+    M.save_qf()
+    vim.fn.setqflist(matching_files)
+    vim.api.nvim_command("buf " .. curr_buf)
+end
+
 local function _edit_qf(qf)
     local lines = {
         "<leader>n - filter by file names, <leader>c - filter by file content,",
         "<leader>m - filter by match content, <leader>s - filter by previous search query,",
+        "<leader>r - refresh,",
         "<leader>a or <leader>w to apply changes, q - leave buffer",
         "",
         "You can also just edit the list under the separator",
@@ -269,31 +300,50 @@ local function _edit_qf(qf)
     local bufnr, win = _create_buf_and_win()
     vim.api.nvim_put(lines, "l", true, true)
 
+    local keymap_opts = { noremap = true, buffer = bufnr, nowait = true }
+
     vim.keymap.set("n", "<leader>n", function()
         local telescope = require("telescope")
         telescope.extensions.aqf.by_name()
         _apply_filter_by_name_results_via_autocmd(bufnr, file_list, old_lines)
-    end, { noremap = true, buffer = bufnr })
+    end, keymap_opts)
 
     vim.keymap.set("n", "<leader>c", function()
         local telescope = require("telescope")
         telescope.extensions.aqf.by_file_content()
         _apply_filter_by_file_content_results_via_autocmd(bufnr, old_lines)
-    end, { noremap = true, buffer = bufnr })
+    end, keymap_opts)
 
     vim.keymap.set("n", "<leader>m", function()
         local telescope = require("telescope")
         telescope.extensions.aqf.by_match_content()
         _apply_filter_by_match_content_results_via_autocmd(bufnr, file_list, old_lines)
-    end, { noremap = true, buffer = bufnr })
+    end, keymap_opts)
 
     vim.keymap.set("n", "<leader>a", function()
         _save_qf_from_current_editing_window(bufnr, sep_line)
-    end, { buffer = bufnr, noremap = true })
+    end, keymap_opts)
 
     vim.keymap.set("n", "<leader>w", function()
         _save_qf_from_current_editing_window(bufnr, sep_line)
-    end, { buffer = bufnr, noremap = true })
+    end, keymap_opts)
+
+    local function refresh()
+        local lnum, col = _get_cursor_pos()
+        vim.api.nvim_command("q")
+        M.edit_curr_qf()
+        vim.fn.cursor(lnum, col)
+    end
+
+    vim.keymap.set("n", "<leader>s", function()
+        filter_qf_by_query(true)
+        refresh()
+        M.save_qf()
+    end, keymap_opts)
+
+    vim.keymap.set("n", "<leader>r", function()
+        refresh()
+    end, keymap_opts)
 
     vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
 end
@@ -324,37 +374,6 @@ function M.prev_qf()
     vim.fn.setqflist(prev_qflist)
 end
 
----@param by_prev_search boolean
-function M.filter_qf_by_query(by_prev_search)
-    local query = ""
-    if by_prev_search then
-        vim.notify("Filtering using latest search pattern (/ reg)")
-        query = vim.fn.getreg("/")
-    else
-        query = vim.fn.input("Search pattern: ")
-    end
-
-    if query == "" then
-        vim.notify("No search pattern provided")
-        return
-    end
-
-    local curr_buf = vim.fn.bufnr()
-    local curr_qflist = vim.fn.getqflist()
-    local matching_files = {}
-    for _, v in ipairs(curr_qflist) do
-        local bufnr = v["bufnr"]
-        vim.api.nvim_command("buf " .. bufnr)
-        local search_res = vim.fn.search(query)
-        if search_res ~= 0 then
-            table.insert(matching_files, v)
-        end
-    end
-    M.save_qf()
-    vim.fn.setqflist(matching_files)
-    vim.api.nvim_command("buf " .. curr_buf)
-end
-
 local function _summarize_qf(qf)
     local file_list = _create_file_list(qf)
     local file_lines = _lineify_file_list(file_list, "    ")
@@ -375,7 +394,6 @@ function M.show_saved_qf_lists()
     end
     local sep = "-"
     table.insert(instructions, sep:rep(M.win_width))
-    local instructions_len = #instructions
 
     local qflists = vim.g.prev_qflists
     local bufnr, win = _create_buf_and_win()
