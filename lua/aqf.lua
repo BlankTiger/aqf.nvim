@@ -1,4 +1,4 @@
-local M = { quit_after_apply = false, prev_qflists_limit = 3, win_height = 50, win_width = 180 }
+local M = { quit_after_apply = false, prev_qflists_limit = 9, win_height = 50, win_width = 180 }
 
 function table.copy(t)
     local u = {}
@@ -10,6 +10,7 @@ end
 
 --- @param opts table
 function M.setup(opts)
+    -- TODO: use vim.deepcopy or something like that to merge user config with defaults instead of manual work
     local quit_after_apply = opts["quit_after_apply"]
     local prev_qflists_limit = opts["prev_qflists_limit"]
     local win_height = opts["win_height"]
@@ -143,9 +144,10 @@ local function _save_qf_from_current_editing_window(bufnr, sep_line)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, qflist)
     vim.api.nvim_command("cexpr []")
     vim.api.nvim_command("caddbuffer")
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buf_content)
     -- FIXME: think of a better way to remove the last entry from undolist
+    -- to prevent user from seeing intermediate step
     vim.cmd.undo()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buf_content)
     vim.fn.cursor(lnum, col)
 end
 
