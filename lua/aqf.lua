@@ -246,7 +246,7 @@ local function _edit_qf(qf)
     local lines = {
         "<leader>n - filter by file names, <leader>c - filter by file content,",
         "<leader>m - filter by match content, <leader>s - filter by previous search query,",
-        "<leader>a to apply changes, q - leave buffer",
+        "<leader>a or <leader>w to apply changes, q - leave buffer",
         "",
         "You can also just edit the list under the separator",
         "",
@@ -288,6 +288,10 @@ local function _edit_qf(qf)
     end, { noremap = true, buffer = bufnr })
 
     vim.keymap.set("n", "<leader>a", function()
+        _save_qf_from_current_editing_window(bufnr, sep_line)
+    end, { buffer = bufnr, noremap = true })
+
+    vim.keymap.set("n", "<leader>w", function()
         _save_qf_from_current_editing_window(bufnr, sep_line)
     end, { buffer = bufnr, noremap = true })
 
@@ -362,6 +366,7 @@ function M.show_saved_qf_lists()
         "",
         "q - leave the buffer, <cr> - open quickfix list under cursor for editing",
         "<leader>s - set quickfix under cursor as current quickfix, <leader>r - refresh",
+        "<leader>d - remove quickfix under cursor",
         "",
         "Please don't remove/modify the separation line",
     }
@@ -380,7 +385,7 @@ function M.show_saved_qf_lists()
         table.insert(qflists_strs, i .. ": ")
         for _, line in pairs(_summarize_qf(qf)) do
             table.insert(qflists_strs, line)
-            line_mapping[i] = #qflists_strs + instructions_len
+            line_mapping[i] = #qflists_strs
         end
     end
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, qflists_strs)
@@ -403,22 +408,38 @@ function M.show_saved_qf_lists()
         return chosen_qf
     end
 
+    local keymap_opts = { noremap = true, buffer = bufnr, nowait = true }
     vim.keymap.set("n", "<cr>", function()
         local chosen_qf = get_chosen_qf_idx()
         _edit_qf(qflists[chosen_qf])
-    end, { noremap = true, buffer = bufnr })
+    end, keymap_opts)
+
+    local function refresh()
+        local lnum, col = _get_cursor_pos()
+        vim.api.nvim_command("q")
+        M.show_saved_qf_lists()
+        vim.fn.cursor(lnum, col)
+    end
+
     vim.keymap.set("n", "<leader>s", function()
         local chosen_qf = get_chosen_qf_idx()
         M.save_qf()
         local qf = qflists[chosen_qf]
         vim.fn.setqflist(qf)
-    end, { noremap = true, buffer = bufnr })
+        refresh()
+    end, keymap_opts)
+
     vim.keymap.set("n", "<leader>r", function()
-        local lnum, col = _get_cursor_pos()
-        vim.api.nvim_command("q")
-        M.show_saved_qf_lists()
-        vim.fn.cursor(lnum, col)
-    end, { noremap = true, buffer = bufnr })
+        refresh()
+    end, keymap_opts)
+
+    vim.keymap.set("n", "<leader>d", function()
+        local chosen_qf = get_chosen_qf_idx()
+        table.remove(qflists, chosen_qf)
+        vim.g.prev_qflists = qflists
+        refresh()
+    end, keymap_opts)
+
     vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
 end
 
