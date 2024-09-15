@@ -46,7 +46,6 @@ local function _filter_by_bufnames(file_list, names)
     for i, v in pairs(file_list) do
         local found = false
         for _, name in pairs(names) do
-            -- vim.notify("Comparing " .. v.filename .. " and " .. name)
             if v.filename == name then
                 found = true
                 break
@@ -59,7 +58,22 @@ local function _filter_by_bufnames(file_list, names)
     return res
 end
 
-local function _filter_by_bufcontent(list, query) end
+local function _filter_by_match_content(file_list, matches)
+    local res = {}
+    for i, v in pairs(file_list) do
+        local found = false
+        for _, match in pairs(matches) do
+            if v.text == match then
+                found = true
+                break
+            end
+        end
+        if found then
+            res[i] = v
+        end
+    end
+    return res
+end
 
 local function _cushion_to_center(text, width)
     local len = text:len()
@@ -199,12 +213,42 @@ local function _apply_filter_by_file_content_results_via_autocmd(aqf_bufnr, pref
     })
 end
 
+local function _apply_filter_by_match_content_results_via_autocmd(
+    aqf_bufnr,
+    file_list,
+    prefix_lines
+)
+    local prompt_bufnr = vim.api.nvim_get_current_buf()
+    vim.api.nvim_create_autocmd("BufLeave", {
+        buffer = prompt_bufnr,
+        group = vim.api.nvim_create_augroup("telescope-aqf", {}),
+        desc = "get selected entries from telescope aqf",
+        callback = function()
+            local matches = vim.g.__aqf_filter_by_match_content_results
+            if not matches then
+                return
+            end
+
+            local filtered = _filter_by_match_content(file_list, matches)
+            local new_lines = table.copy(prefix_lines)
+            local new_file_lines = _lineify_file_list(filtered, nil)
+            vim.g.__aqf_file_lines = new_file_lines
+            for _, v in pairs(new_file_lines) do
+                table.insert(new_lines, v)
+            end
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, {})
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 1, -1, false, new_lines)
+        end,
+    })
+end
+
 local function _edit_qf(qf)
     local lines = {
-        "<leader>n - filter by file names, <leader>c - filter by file content, <leader>s - filter by previous search query,",
-        "<leader>m - filter by match content, <leader>tab - toggle entry selection, q - leave buffer",
+        "<leader>n - filter by file names, <leader>c - filter by file content,",
+        "<leader>m - filter by match content, <leader>s - filter by previous search query,",
+        "<leader>a to apply changes, q - leave buffer",
         "",
-        "You can also just edit the list under the separator and do <leader>a to apply changes",
+        "You can also just edit the list under the separator",
         "",
         "Please don't remove/modify the separation line",
     }
@@ -235,6 +279,12 @@ local function _edit_qf(qf)
         local telescope = require("telescope")
         telescope.extensions.aqf.by_file_content()
         _apply_filter_by_file_content_results_via_autocmd(bufnr, old_lines)
+    end, { noremap = true, buffer = bufnr })
+
+    vim.keymap.set("n", "<leader>m", function()
+        local telescope = require("telescope")
+        telescope.extensions.aqf.by_match_content()
+        _apply_filter_by_match_content_results_via_autocmd(bufnr, file_list, old_lines)
     end, { noremap = true, buffer = bufnr })
 
     vim.keymap.set("n", "<leader>a", function()

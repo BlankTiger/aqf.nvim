@@ -172,6 +172,73 @@ local function by_file_content(opts)
     end, { remap = true, buffer = prompt_bufnr })
 end
 
+function string.cutn(s, search, n)
+    local c = 0
+    local txt = s
+    local idx = 1
+    while c < n do
+        idx = txt:find(search)
+        if not idx then
+            return nil
+        end
+        txt = txt:sub(idx + 1, -1)
+        c = c + 1
+    end
+    return txt
+end
+
+local function by_match_content(opts)
+    if not opts then
+        opts = { fname_width = 200, path_display = { "absolute" } }
+    end
+    local filtered_qf = vim.g.__aqf_file_lines
+    local filtered_qf_str = ""
+    for _, v in pairs(filtered_qf) do
+        local match_text = string.cutn(v, ":", 3)
+        -- TODO: think if deduplicating is worth it here
+        -- if filtered_qf_str:find(match_text) then
+        --     goto continue
+        -- end
+        filtered_qf_str = filtered_qf_str .. match_text .. "\n"
+        -- ::continue::
+    end
+
+    -- local tmpfile = io.tmpfile()
+    -- tmpfile:write(filtered_qf_str)
+    local result = with(open("/tmp/aqftmpmatches", "w"), function(reader)
+        reader:write(filtered_qf_str)
+    end)
+    local live_grepper = finders.new_job(function(prompt)
+        if not prompt or prompt == "" then
+            return nil
+        end
+        local rg_args = split(prompt)
+        table.insert(rg_args, "")
+        table.insert(rg_args, "/tmp/aqftmpmatches")
+        return rg_args
+    end, opts.entry_maker or make_entry.gen_from_string(opts))
+
+    vim.g.__aqf_filter_by_match_content_results = nil
+    pickers
+        .new(opts, {
+            prompt_title = "Filter quickfix by match content",
+            finder = live_grepper,
+            sorter = sorters.get_generic_fuzzy_sorter(),
+            default_text = "rg -N -I --no-heading --no-column ",
+        })
+        :find()
+
+    local prompt_bufnr = vim.api.nvim_get_current_buf()
+    vim.keymap.set("i", "<cr>", function()
+        local results = {}
+        utils.map_entries(prompt_bufnr, function(entry, index, row)
+            table.insert(results, entry.value)
+        end)
+        vim.g.__aqf_filter_by_match_content_results = results
+        actions.close(prompt_bufnr)
+    end, { remap = true, buffer = prompt_bufnr })
+end
+
 return telescope.register_extension({
     setup = function(opts, _)
         opts = vim.tbl_extend("force", default_opts, opts)
@@ -179,5 +246,6 @@ return telescope.register_extension({
     exports = {
         by_name = by_name,
         by_file_content = by_file_content,
+        by_match_content = by_match_content,
     },
 })
