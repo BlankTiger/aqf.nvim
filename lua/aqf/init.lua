@@ -1,4 +1,41 @@
-local M = { quit_after_apply = false, prev_qflists_limit = 9, win_height = 50, win_width = 180 }
+local default_config = {
+    windowed = true,
+    quit_after_apply = false,
+    prev_qflists_limit = 9,
+    win_height = 50,
+    win_width = 180,
+    debug = false,
+    on_debug = function() end,
+}
+
+local M = {
+    config = default_config,
+}
+
+--- @param opts table | nil
+function M.setup(opts)
+    local config = vim.tbl_deep_extend("keep", opts or {}, default_config)
+    M.config = config
+    vim.g.__prev_qflists = {}
+
+    -- TODO: add autocmd actions to update win_height and win_width if window size changes when running fullscreen
+
+    if M.config.debug then
+        vim.keymap.set("n", "<leader>P", M.show_saved_qf_lists, { noremap = true })
+        vim.keymap.set("n", "<leader>E", M.edit_curr_qf, { noremap = true })
+        vim.keymap.set("n", "<leader>S", M.show_saved_qf_lists, { noremap = true })
+        vim.keymap.set("n", "<leader>R", function()
+            vim.cmd([[
+Lazy reload aqf.nvim
+Lazy reload telescope.nvim
+Lazy reload aqf.nvim
+Lazy reload telescope.nvim
+    ]])
+        end, { noremap = true })
+
+        M.config.on_debug()
+    end
+end
 
 function table.copy(t)
     local u = {}
@@ -6,39 +43,6 @@ function table.copy(t)
         u[k] = v
     end
     return setmetatable(u, getmetatable(t))
-end
-
---- @param opts table
-function M.setup(opts)
-    -- TODO: use vim.deepcopy or something like that to merge user config with defaults instead of manual work
-    local quit_after_apply = opts["quit_after_apply"]
-    local prev_qflists_limit = opts["prev_qflists_limit"]
-    local win_height = opts["win_height"]
-    local win_width = opts["win_width"]
-    if quit_after_apply == true then
-        M.quit_after_apply = true
-    end
-    if prev_qflists_limit then
-        M.prev_qflists_limit = prev_qflists_limit
-    end
-    if win_height then
-        M.win_height = win_height
-    end
-    if win_width then
-        M.win_width = win_width
-    end
-    vim.g.prev_qflists = {}
-    vim.keymap.set("n", "<leader>P", M.show_saved_qf_lists, { noremap = true })
-    vim.keymap.set("n", "<leader>E", M.edit_curr_qf, { noremap = true })
-    vim.keymap.set("n", "<leader>S", M.show_saved_qf_lists, { noremap = true })
-    vim.keymap.set("n", "<leader>R", function()
-        vim.cmd([[
-Lazy reload aqf.nvim
-Lazy reload telescope.nvim
-Lazy reload aqf.nvim
-Lazy reload telescope.nvim
-    ]])
-    end, { noremap = true })
 end
 
 local function _filter_by_bufnames(file_list, names)
@@ -86,19 +90,49 @@ local function _create_entry(filename, text, bufnr, col, line_num)
     return { filename = filename, text = text, bufnr = bufnr, col = col, lnum = line_num }
 end
 
-local function _create_buf_and_win()
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    local ui = vim.api.nvim_list_uis()[1]
-    local win = vim.api.nvim_open_win(bufnr, true, {
-        width = M.win_width,
-        height = M.win_height,
-        style = "minimal",
-        border = "rounded",
-        relative = "editor",
-        anchor = "NW",
-        col = ui.width / 2 - M.win_width / 2,
-        row = ui.height / 2 - M.win_height / 2,
+local function _create_buf_and_win(tabname)
+    local win_opts = {}
+    local bufnr = nil
+    local win = nil
+    if M.config.windowed then
+        bufnr = vim.api.nvim_create_buf(false, true)
+        local ui = vim.api.nvim_list_uis()[1]
+        win_opts = {
+            width = M.config.win_width,
+            height = M.config.win_height,
+            style = "minimal",
+            border = "rounded",
+            relative = "editor",
+            anchor = "NW",
+            col = ui.width / 2 - M.config.win_width / 2,
+            row = ui.height / 2 - M.config.win_height / 2,
+        }
+        win = vim.api.nvim_open_win(bufnr, true, win_opts)
+    else
+        local cmd = "tabnew"
+        vim.api.nvim_command(cmd)
+        bufnr = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_set_current_buf(bufnr)
+        local rename_cmd = "keepalt file " .. tabname
+        vim.api.nvim_command(rename_cmd)
+        win = vim.api.nvim_get_current_win()
+    end
+
+    -- TODO: think hard about another way to handle closing buffer when exiting floating window or tabpage, cause this aint it
+    vim.api.nvim_create_autocmd("TabLeave", {
+        buffer = bufnr,
+        group = vim.api.nvim_create_augroup("aqf", {}),
+        desc = "close buffer for aqf",
+        callback = function()
+            if M.config.windowed then
+            else
+                -- local winid = vim.api.nvim_get_current_win()
+                -- vim.api.nvim_win_close(winid, true)
+                vim.api.nvim_buf_delete(bufnr, { force = true, unload = true })
+            end
+        end,
     })
+
     return bufnr, win
 end
 
@@ -242,13 +276,18 @@ local function _apply_filter_by_match_content_results_via_autocmd(
     })
 end
 
-function filter_qf_by_query(by_prev_search)
-    local query = ""
+---@param query string | nil
+---@param by_prev_search boolean
+local function filter_qf_by_query(by_prev_search, query)
+    if query == nil then
+        query = ""
+    elseif query == nil and not by_prev_search then
+        query = vim.fn.input("Search pattern: ")
+    end
+
     if by_prev_search then
         vim.notify("Filtering using latest search pattern (/ reg)")
         query = vim.fn.getreg("/")
-    else
-        query = vim.fn.input("Search pattern: ")
     end
 
     if query == "" then
@@ -272,6 +311,23 @@ function filter_qf_by_query(by_prev_search)
     vim.api.nvim_command("buf " .. curr_buf)
 end
 
+local function _get_width()
+    local width = nil
+    if M.config.windowed then
+        width = M.config.win_width
+    else
+        local win = vim.api.nvim_get_current_win()
+        local _info = vim.fn.getwininfo(win)
+        local info = {}
+        for _, v in pairs(_info) do
+            info = v
+            break
+        end
+        width = info.width - info.textoff
+    end
+    return width
+end
+
 local function _edit_qf(qf)
     local lines = {
         "<leader>n - filter by file names, <leader>c - filter by file content,",
@@ -283,11 +339,12 @@ local function _edit_qf(qf)
         "",
         "Please don't remove/modify the separation line",
     }
+    local bufnr, win = _create_buf_and_win("aqf - editor")
     for i, inst in pairs(lines) do
-        lines[i] = _cushion_to_center(inst, M.win_width)
+        lines[i] = _cushion_to_center(inst, _get_width())
     end
     local sep = "-"
-    local sep_line = sep:rep(M.win_width)
+    local sep_line = sep:rep(_get_width())
     table.insert(lines, sep_line)
 
     local file_list = _create_file_list(qf)
@@ -297,7 +354,6 @@ local function _edit_qf(qf)
         table.insert(lines, v)
     end
 
-    local bufnr, win = _create_buf_and_win()
     vim.api.nvim_put(lines, "l", true, true)
 
     local keymap_opts = { noremap = true, buffer = bufnr, nowait = true }
@@ -345,7 +401,11 @@ local function _edit_qf(qf)
         refresh()
     end, keymap_opts)
 
-    vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
+    if M.config.windowed then
+        vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
+    else
+        vim.keymap.set("n", "q", "<cmd>tabclose<cr>", { noremap = true, buffer = bufnr })
+    end
 end
 
 function M.edit_curr_qf()
@@ -355,22 +415,22 @@ end
 
 function M.save_qf()
     local curr_qflist = vim.fn.getqflist()
-    local qflists = vim.g.prev_qflists
+    local qflists = vim.g.__prev_qflists
     local len_qfs = #qflists
-    if len_qfs > M.prev_qflists_limit then
+    if len_qfs > M.config.prev_qflists_limit then
         table.remove(qflists, 1)
     end
     table.insert(qflists, curr_qflist)
-    vim.g.prev_qflists = qflists
+    vim.g.__prev_qflists = qflists
 end
 
 function M.prev_qf()
     local curr_qflist = vim.fn.getqflist()
-    local len_prev_qflists = #vim.g.prev_qflists
-    local prev_qflist = vim.g.prev_qflists[len_prev_qflists]
-    local prev_qflists = vim.g.prev_qflists
+    local len_prev_qflists = #vim.g.__prev_qflists
+    local prev_qflist = vim.g.__prev_qflists[len_prev_qflists]
+    local prev_qflists = vim.g.__prev_qflists
     prev_qflists[len_prev_qflists] = curr_qflist
-    vim.g.prev_qflists = prev_qflists
+    vim.g.__prev_qflists = prev_qflists
     vim.fn.setqflist(prev_qflist)
 end
 
@@ -389,14 +449,14 @@ function M.show_saved_qf_lists()
         "",
         "Please don't remove/modify the separation line",
     }
+    local bufnr, win = _create_buf_and_win("aqf - history")
     for i, inst in pairs(instructions) do
-        instructions[i] = _cushion_to_center(inst, M.win_width)
+        instructions[i] = _cushion_to_center(inst, _get_width())
     end
     local sep = "-"
-    table.insert(instructions, sep:rep(M.win_width))
+    table.insert(instructions, sep:rep(_get_width()))
 
-    local qflists = vim.g.prev_qflists
-    local bufnr, win = _create_buf_and_win()
+    local qflists = vim.g.__prev_qflists
     local qflists_strs = instructions
     local line_mapping = {}
     for i, qf in pairs(qflists) do
@@ -454,11 +514,15 @@ function M.show_saved_qf_lists()
     vim.keymap.set("n", "<leader>d", function()
         local chosen_qf = get_chosen_qf_idx()
         table.remove(qflists, chosen_qf)
-        vim.g.prev_qflists = qflists
+        vim.g.__prev_qflists = qflists
         refresh()
     end, keymap_opts)
 
-    vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
+    if M.config.windowed then
+        vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
+    else
+        vim.keymap.set("n", "q", "<cmd>tabclose<cr>", { noremap = true, buffer = bufnr })
+    end
 end
 
 return M
