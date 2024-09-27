@@ -12,10 +12,21 @@ local state = require("telescope.actions.state")
 local utils = require("telescope.actions.utils")
 local conf = require("telescope.config").values
 local plenary = require("plenary")
+local Path = require("plenary.path")
 local with = plenary.context_manager.with
 local open = plenary.context_manager.open
 
 local default_opts = {}
+local _data_path = vim.fn.stdpath("data")
+local data_path = _data_path .. "/aqf"
+Path:new(data_path):mkdir()
+
+local aqf_tmp_filenames_path = data_path .. "/aqf_tmp_filenames"
+local aqf_tmp_matches_path = data_path .. "/aqf_tmp_matches"
+local aqf_tmp_filenames = Path:new(aqf_tmp_filenames_path)
+local aqf_tmp_matches = Path:new(aqf_tmp_matches_path)
+aqf_tmp_filenames:write("", "w")
+aqf_tmp_matches:write("", "w")
 
 local function split(command)
     local cmd_split = {}
@@ -72,18 +83,14 @@ local function by_name(opts)
         ::continue::
     end
 
-    -- local tmpfile = io.tmpfile()
-    -- tmpfile:write(filtered_qf_str)
-    local result = with(open("/tmp/aqftmpfilenames", "w"), function(reader)
-        reader:write(filtered_qf_str)
-    end)
+    aqf_tmp_filenames:write(filtered_qf_str, "w")
     local live_grepper = finders.new_job(function(prompt)
         if not prompt or prompt == "" then
             return nil
         end
         local rg_args = split(prompt)
         table.insert(rg_args, "")
-        table.insert(rg_args, "/tmp/aqftmpfilenames")
+        table.insert(rg_args, aqf_tmp_filenames_path)
         return rg_args
     end, opts.entry_maker or make_entry.gen_from_file(opts))
 
@@ -140,7 +147,6 @@ local function by_file_content(opts)
         end
         local rg_args = split(prompt)
 
-        -- table.insert(rg_args, "")
         local filenames = _filenames_from_qf_lines(vim.g.__aqf_file_lines)
         local unique_filenames = _deduplicate(filenames)
         for _, name in pairs(unique_filenames) do
@@ -203,18 +209,14 @@ local function by_match_content(opts)
         -- ::continue::
     end
 
-    -- local tmpfile = io.tmpfile()
-    -- tmpfile:write(filtered_qf_str)
-    local result = with(open("/tmp/aqftmpmatches", "w"), function(reader)
-        reader:write(filtered_qf_str)
-    end)
+    aqf_tmp_matches:write(filtered_qf_str, "w")
     local live_grepper = finders.new_job(function(prompt)
         if not prompt or prompt == "" then
             return nil
         end
         local rg_args = split(prompt)
         table.insert(rg_args, "")
-        table.insert(rg_args, "/tmp/aqftmpmatches")
+        table.insert(rg_args, aqf_tmp_matches_path)
         return rg_args
     end, opts.entry_maker or make_entry.gen_from_string(opts))
 
