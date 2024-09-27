@@ -1,5 +1,5 @@
 local default_config = {
-    windowed = true,
+    windowed = false,
     quit_after_apply = false,
     prev_qflists_limit = 9,
     win_height = 50,
@@ -197,6 +197,9 @@ local function _save_qf_from_current_editing_window(bufnr, sep_line)
     vim.cmd.undo()
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buf_content)
     vim.fn.cursor(lnum, col)
+    if M.config.quit_after_apply then
+        vim.api.nvim_command("q")
+    end
 end
 
 local function _apply_filter_by_name_results_via_autocmd(aqf_bufnr, file_list, prefix_lines)
