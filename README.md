@@ -36,7 +36,7 @@ If you only want the 'edit quickfix as a buffer' workflow:
 {
     "blanktiger/aqf.nvim",
     config = function()
-        require("aqf.nvim").setup({})
+        require("aqf.nvim").setup()
     end,
 }
 ```
@@ -49,13 +49,40 @@ If you want all filtering features:
 {
     "blanktiger/aqf.nvim",
     config = function()
-        require("aqf.nvim").setup({})
+        require("aqf.nvim").setup()
+        local telescope = require("telescope")
+        telescope.load_extension("aqf")
     end,
-    dependencies = {}
+    dependencies = {
+        "nvim-lua/plenary.nvim",
+        "nvim-telescope/telescope.nvim",
+    }
 }
 ```
 
-# ⚙️ Configuration
+# ⚙️ Configuration options
+
+Following is the default configuration:
+
+```lua
+-- you can call setup function with the following options in a lua table:
+local opts = {
+    -- if set to true, then aqf will create floating windows, if not it will create UIs in new tabs
+    windowed = false,
+    -- quit editing buffer for currently edited quickfix after saving it
+    quit_after_apply = false,
+    -- amount of quickfix windows kept in quickfix history
+    prev_qflists_limit = 9,
+    -- height of a window if `windowed = true`
+    win_height = 50,
+    -- width of a window if `windowed = true`
+    win_width = 180,
+    -- set some keymaps and possibly some other stuff for debug/development
+    debug = false,
+    -- function that is executed during setup if `debug = true`
+    on_debug = function() end,
+}
+```
 
 # 🗒️ Available commands
 
