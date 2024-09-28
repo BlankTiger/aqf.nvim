@@ -6,21 +6,43 @@ on:
             - master
 
 jobs:
-    generate-doc:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: panvimdoc
-              uses: kdheepak/panvimdoc@main
-              with:
-                  vimdoc: aqf
-                  version: "Neovim >= 0.9.0"
-                  titledatepattern: "%Y"
-                  demojify: true
-                  treesitter: true
+  check_if_docs_changed:
+    runs-on: ubuntu-latest
+    outputs:
+      docs_changed: ${{ steps.check_file_changed.outputs.docs_changed }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    - shell: pwsh
+      id: check_file_changed
+      run: |
+        # Diff HEAD with the previous commit
+        $diff = git diff --name-only HEAD^ HEAD
 
-            - name: Push changes
-              if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-              uses: stefanzweifel/git-auto-commit-action@v5
-              with:
-                  commit_message: "docs: auto-generate vimdoc"
+        # Check if *.md has changed
+        $SourceDiff = $diff | Where-Object { $_ -match '.md$' }
+        $HasDiff = $SourceDiff.Length -gt 0
+
+        # Set the output named "docs_changed"
+        Write-Host "::set-output name=docs_changed::$HasDiff"
+
+  generate-doc:
+    runs-on: ubuntu-latest
+    needs: [ check_if_docs_changed ]
+    if: needs.check_if_docs_changed.outputs.docs_changed == 'True'
+    steps:
+      - uses: actions/checkout@v4
+      - name: panvimdoc
+        uses: kdheepak/panvimdoc@main
+        with:
+          vimdoc: aqf
+          version: "Neovim >= 0.9.0"
+          titledatepattern: "%Y"
+          demojify: true
+          treesitter: true
+      - name: Push changes
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: auto-generate vimdoc"
