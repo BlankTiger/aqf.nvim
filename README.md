@@ -36,7 +36,7 @@ If you only want the 'edit quickfix as a buffer' workflow:
 {
     "blanktiger/aqf.nvim",
     config = function()
-        require("aqf.nvim").setup()
+        require("aqf").setup()
     end,
 }
 ```
@@ -49,7 +49,7 @@ If you want all filtering features:
 {
     "blanktiger/aqf.nvim",
     config = function()
-        require("aqf.nvim").setup()
+        require("aqf").setup()
         local telescope = require("telescope")
         telescope.load_extension("aqf")
     end,
