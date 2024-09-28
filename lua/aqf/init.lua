@@ -27,6 +27,7 @@ Lazy reload telescope.nvim
 function M.setup(opts)
     local config = vim.tbl_deep_extend("keep", opts or {}, M.config)
     M.config = config
+    M.config.windowed = true
     vim.g.__prev_qflists = {}
 
     -- TODO: add autocmd actions to update win_height and win_width if window size changes when running fullscreen
@@ -93,6 +94,15 @@ local function _create_buf_and_win(tabname)
     local win_opts = {}
     local bufnr = nil
     local win = nil
+
+    -- remove buffers if they already exist
+    for _, buf_handle in pairs(vim.api.nvim_list_bufs()) do
+        local bufname = vim.fn.bufname(buf_handle)
+        if bufname == tabname then
+            vim.api.nvim_buf_delete(buf_handle, { force = true, unload = true })
+        end
+    end
+
     if M.config.windowed then
         bufnr = vim.api.nvim_create_buf(false, true)
         local ui = vim.api.nvim_list_uis()[1]
@@ -110,23 +120,20 @@ local function _create_buf_and_win(tabname)
     else
         local cmd = "tabnew"
         vim.api.nvim_command(cmd)
-        bufnr = vim.api.nvim_create_buf(false, true)
+        bufnr = vim.api.nvim_create_buf(true, true)
         vim.api.nvim_set_current_buf(bufnr)
         local rename_cmd = "keepalt file " .. tabname
         vim.api.nvim_command(rename_cmd)
         win = vim.api.nvim_get_current_win()
     end
 
-    -- TODO: think hard about another way to handle closing buffer when exiting floating window or tabpage, cause this aint it
-    vim.api.nvim_create_autocmd("TabLeave", {
+    vim.api.nvim_create_autocmd("QuitPre", {
         buffer = bufnr,
         group = vim.api.nvim_create_augroup("aqf", {}),
         desc = "close buffer for aqf",
         callback = function()
             if M.config.windowed then
             else
-                -- local winid = vim.api.nvim_get_current_win()
-                -- vim.api.nvim_win_close(winid, true)
                 vim.api.nvim_buf_delete(bufnr, { force = true, unload = true })
             end
         end,
@@ -334,8 +341,7 @@ local function _edit_qf(qf)
     local lines = {
         "<leader>n - filter by file names, <leader>c - filter by file content,",
         "<leader>m - filter by match content, <leader>s - filter by previous search query,",
-        "<leader>r - refresh,",
-        "<leader>a or <leader>w to apply changes, q - leave buffer",
+        "<leader>r - refresh, <leader>a or <leader>w to apply changes, q - leave buffer",
         "",
         "You can also just edit the list under the separator",
         "",
@@ -403,11 +409,7 @@ local function _edit_qf(qf)
         refresh()
     end, keymap_opts)
 
-    if M.config.windowed then
-        vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
-    else
-        vim.keymap.set("n", "q", "<cmd>tabclose<cr>", { noremap = true, buffer = bufnr })
-    end
+    vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
 end
 
 function M.edit_curr_qf()
@@ -520,11 +522,7 @@ function M.show_saved_qf_lists()
         refresh()
     end, keymap_opts)
 
-    if M.config.windowed then
-        vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
-    else
-        vim.keymap.set("n", "q", "<cmd>tabclose<cr>", { noremap = true, buffer = bufnr })
-    end
+    vim.keymap.set("n", "q", "<cmd>q<cr>", { noremap = true, buffer = bufnr })
 end
 
 return M
