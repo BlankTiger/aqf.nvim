@@ -17,6 +17,8 @@ Additionally, with help of [telescope.nvim](https://github.com/nvim-telescope/te
 - by match content,
 - by file content.
 
+https://github.com/user-attachments/assets/0e79c371-5fee-4b8d-b9ae-1083d33ceea1
+
 # ☑️ Requirements
 
 - If you want to only use the 'edit quickfix as a buffer' workflow, then you don't have to install any additional things.
