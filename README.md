@@ -80,7 +80,19 @@ local opts = {
     -- set some keymaps and possibly some other stuff for debug/development
     debug = false,
     -- function that is executed during setup if `debug = true`
-    on_debug = function() end,
+    on_debug = function()
+        vim.keymap.set("n", "<leader>P", M.show_saved_qf_lists, { noremap = true })
+        vim.keymap.set("n", "<leader>E", M.edit_curr_qf, { noremap = true })
+        vim.keymap.set("n", "<leader>S", M.show_saved_qf_lists, { noremap = true })
+        vim.keymap.set("n", "<leader>R", function()
+            vim.cmd([[
+Lazy reload aqf.nvim
+Lazy reload telescope.nvim
+Lazy reload aqf.nvim
+Lazy reload telescope.nvim
+    ]])
+        end, { noremap = true })
+    end,
 }
 ```
 

@@ -1,26 +1,14 @@
-local default_config = {
+local M = {}
+
+-- default config
+M.config = {
     windowed = false,
     quit_after_apply = false,
     prev_qflists_limit = 9,
     win_height = 50,
     win_width = 180,
     debug = false,
-    on_debug = function() end,
-}
-
-local M = {
-    config = default_config,
-}
-
---- @param opts table | nil
-function M.setup(opts)
-    local config = vim.tbl_deep_extend("keep", opts or {}, default_config)
-    M.config = config
-    vim.g.__prev_qflists = {}
-
-    -- TODO: add autocmd actions to update win_height and win_width if window size changes when running fullscreen
-
-    if M.config.debug then
+    on_debug = function()
         vim.keymap.set("n", "<leader>P", M.show_saved_qf_lists, { noremap = true })
         vim.keymap.set("n", "<leader>E", M.edit_curr_qf, { noremap = true })
         vim.keymap.set("n", "<leader>S", M.show_saved_qf_lists, { noremap = true })
@@ -32,7 +20,18 @@ Lazy reload aqf.nvim
 Lazy reload telescope.nvim
     ]])
         end, { noremap = true })
+    end,
+}
 
+--- @param opts table | nil
+function M.setup(opts)
+    local config = vim.tbl_deep_extend("keep", opts or {}, M.config)
+    M.config = config
+    vim.g.__prev_qflists = {}
+
+    -- TODO: add autocmd actions to update win_height and win_width if window size changes when running fullscreen
+
+    if M.config.debug then
         M.config.on_debug()
     end
 end
