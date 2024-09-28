@@ -5,7 +5,7 @@
 * [🔭 Overview](#-overview)
 * [☑️ Requirements](#️-requirements)
 * [🧰 Installation](#-installation)
-* [⚙️ Configuration](#️-configuration)
+* [⚙️ Configuration options](#️-configuration-options)
 * [🗒️ Available commands](#️-available-commands)
 
 # 🔭 Overview
