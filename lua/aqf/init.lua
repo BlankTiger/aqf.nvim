@@ -27,7 +27,6 @@ Lazy reload telescope.nvim
 function M.setup(opts)
     local config = vim.tbl_deep_extend("keep", opts or {}, M.config)
     M.config = config
-    M.config.windowed = true
     vim.g.__prev_qflists = {}
 
     -- TODO: add autocmd actions to update win_height and win_width if window size changes when running fullscreen
