@@ -4,12 +4,18 @@ local M = {}
 M.config = {
     windowed = false,
     quit_after_apply = false,
+    save_when_selecting_from_history = true,
     prev_qflists_limit = 9,
     win_height = 50,
     win_width = 180,
     debug = false,
     on_debug = function()
         vim.keymap.set("n", "<leader>P", M.show_saved_qf_lists, { noremap = true })
+        vim.keymap.set("n", "<leader>GP", M.prev_qf, { noremap = true })
+        vim.keymap.set("n", "<leader>GN", M.next_qf, { noremap = true })
+        vim.keymap.set("n", "<leader>G1", function() M.goto_qf(1) end, { noremap = true })
+        vim.keymap.set("n", "<leader>G2", function() M.goto_qf(2) end, { noremap = true })
+        vim.keymap.set("n", "<leader>G3", function() M.goto_qf(3) end, { noremap = true })
         vim.keymap.set("n", "<leader>E", M.edit_curr_qf, { noremap = true })
         vim.keymap.set("n", "<leader>S", M.show_saved_qf_lists, { noremap = true })
         vim.keymap.set("n", "<leader>R", function()
@@ -523,10 +529,12 @@ function M.show_saved_qf_lists()
 
     vim.keymap.set("n", "<leader>s", function()
         local chosen_qf = get_chosen_qf_idx()
-        M.save_qf()
+        if M.config.save_when_selecting_from_history then
+            M.save_qf()
+            refresh()
+        end
         local qf = qflists[chosen_qf]
         vim.fn.setqflist(qf)
-        refresh()
     end, keymap_opts)
 
     vim.keymap.set("n", "<leader>r", function()
