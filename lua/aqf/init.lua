@@ -27,7 +27,8 @@ Lazy reload telescope.nvim
 function M.setup(opts)
     local config = vim.tbl_deep_extend("keep", opts or {}, M.config)
     M.config = config
-    vim.g.__prev_qflists = {}
+    M.__prev_qflists = {}
+    M.__curr_idx_in_history = 0
 
     -- TODO: add autocmd actions to update win_height and win_width if window size changes when running fullscreen
 
@@ -416,23 +417,43 @@ end
 
 function M.save_qf()
     local curr_qflist = vim.fn.getqflist()
-    local qflists = vim.g.__prev_qflists
+    local qflists = M.__prev_qflists
     local len_qfs = #qflists
     if len_qfs > M.config.prev_qflists_limit then
-        table.remove(qflists, 1)
+        table.remove(qflists, len_qfs)
     end
-    table.insert(qflists, curr_qflist)
-    vim.g.__prev_qflists = qflists
+    table.insert(qflists, 1, curr_qflist)
+    M.__prev_qflists = qflists
+    M.__curr_idx_in_history = 0
 end
 
 function M.prev_qf()
-    local curr_qflist = vim.fn.getqflist()
-    local len_prev_qflists = #vim.g.__prev_qflists
-    local prev_qflist = vim.g.__prev_qflists[len_prev_qflists]
-    local prev_qflists = vim.g.__prev_qflists
-    prev_qflists[len_prev_qflists] = curr_qflist
-    vim.g.__prev_qflists = prev_qflists
+    if M.__curr_idx_in_history == 0 then
+        M.save_qf()
+        M.__curr_idx_in_history = 1
+    end
+    M.__curr_idx_in_history = math.min(M.__curr_idx_in_history + 1, #M.__prev_qflists)
+    local prev_qflist = M.__prev_qflists[M.__curr_idx_in_history]
     vim.fn.setqflist(prev_qflist)
+end
+
+function M.next_qf()
+    if M.__curr_idx_in_history == 0 then
+        return
+    end
+    M.__curr_idx_in_history = math.max(1, M.__curr_idx_in_history - 1)
+    local next_qflist = M.__prev_qflists[M.__curr_idx_in_history]
+    vim.fn.setqflist(next_qflist)
+end
+
+---@param index integer
+function M.goto_qf(index)
+    local chosen_qf = M.__prev_qflists[index]
+    if not chosen_qf then
+        vim.notify("There is no quickfix list in history at index: " .. index, vim.log.levels.ERROR)
+        return
+    end
+    vim.fn.setqflist(chosen_qf)
 end
 
 local function _summarize_qf(qf)
@@ -457,7 +478,7 @@ function M.show_saved_qf_lists()
     local sep = "-"
     table.insert(instructions, sep:rep(_get_width()))
 
-    local qflists = vim.g.__prev_qflists
+    local qflists = M.__prev_qflists
     local qflists_strs = instructions
     local line_mapping = {}
     for i, qf in pairs(qflists) do
@@ -515,7 +536,7 @@ function M.show_saved_qf_lists()
     vim.keymap.set("n", "<leader>d", function()
         local chosen_qf = get_chosen_qf_idx()
         table.remove(qflists, chosen_qf)
-        vim.g.__prev_qflists = qflists
+        M.__prev_qflists = qflists
         refresh()
     end, keymap_opts)
 
