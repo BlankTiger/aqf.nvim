@@ -73,6 +73,8 @@ local opts = {
     windowed = false,
     -- quit editing buffer for currently edited quickfix after saving it
     quit_after_apply = false,
+    -- selecting from history saves current quickfix list to history as the most recent entry
+    save_when_selecting_from_history = true,
     -- amount of quickfix windows kept in quickfix history
     prev_qflists_limit = 9,
     -- height of a window if `windowed = true`
@@ -118,6 +120,16 @@ aqf.show_saved_qf_lists()
 -- Save current quickfix list to history of quickfix lists.
 aqf.save_qf()
 
--- Save and swap current quickfix list with the newest one found in history.
+-- Save current quickfix to history (if jumping back in history for the first time)
+-- and go back in history of quickfix lists by 1. 
+-- NOTE: Creating a new entry in history moves counter over to the newest entry.
 aqf.prev_qf()
+
+-- Go forward in history of quickfix lists by 1.
+-- NOTE: Creating a new entry in history moves counter over to the newest entry.
+aqf.next_qf()
+
+-- Go to arbitrary quickfix in history by index starting from the most recent one (index = 1).
+---@param index integer
+aqf.goto_qf(index)
 ```
