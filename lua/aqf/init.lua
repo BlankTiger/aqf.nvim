@@ -176,6 +176,7 @@ end
 local function _save_qf_from_current_editing_window(bufnr, sep_line)
     local buf_content = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     local qflist = {}
+    local qflist_str = ""
     local found_sep_line = false
     for _, v in pairs(buf_content) do
         if v:find(sep_line, nil, true) then
@@ -187,21 +188,18 @@ local function _save_qf_from_current_editing_window(bufnr, sep_line)
         end
 
         table.insert(qflist, v)
+        qflist_str = qflist_str .. v .. "\n"
 
         ::continue::
     end
+    if qflist_str:find("\n", nil, true) then
+        qflist_str = qflist_str:sub(1, -2)
+    end
 
     M.save_qf()
-
-    local lnum, col = _get_cursor_pos()
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, qflist)
     vim.api.nvim_command("cexpr []")
-    vim.api.nvim_command("caddbuffer")
-    -- FIXME: think of a better way to remove the last entry from undolist
-    -- to prevent user from seeing intermediate step
-    vim.cmd.undo()
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, buf_content)
-    vim.fn.cursor(lnum, col)
+    vim.api.nvim_command("caddexpr '" .. qflist_str .. "'")
+
     if M.config.quit_after_apply then
         vim.api.nvim_command("q")
     end
