@@ -97,7 +97,7 @@ local function by_name(opts)
     vim.g.__aqf_filter_by_name_results = nil
     pickers
         .new(opts, {
-            prompt_title = "Filter quickfix by filename",
+            prompt_title = "Filter quickfix by filename, <cr> to apply filter",
             finder = live_grepper,
             sorter = sorters.get_generic_fuzzy_sorter(),
             default_text = "rg -N -I --no-heading --no-column ",
@@ -159,7 +159,7 @@ local function by_file_content(opts)
     vim.g.__aqf_filter_by_file_content_results = nil
     pickers
         .new(opts, {
-            prompt_title = "Filter quickfix by file content",
+            prompt_title = "Filter quickfix by file content, <cr> to apply filter",
             finder = live_grepper,
             previewer = conf.grep_previewer(opts),
             sorter = sorters.get_generic_fuzzy_sorter(),
@@ -223,7 +223,7 @@ local function by_match_content(opts)
     vim.g.__aqf_filter_by_match_content_results = nil
     pickers
         .new(opts, {
-            prompt_title = "Filter quickfix by match content",
+            prompt_title = "Filter quickfix by match content, <cr> to apply filter",
             finder = live_grepper,
             sorter = sorters.get_generic_fuzzy_sorter(),
             default_text = "rg -N -I --no-heading --no-column ",

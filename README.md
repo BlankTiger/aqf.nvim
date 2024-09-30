@@ -6,6 +6,7 @@
 * [☑️ Requirements](#️-requirements)
 * [🧰 Installation](#-installation)
 * [⚙️ Configuration options](#️-configuration-options)
+* [🔎 Filtering with telescope.nvim](#-filtering-with-telescopenvim)
 * [🗒️ Available commands](#️-available-commands)
 
 # 🔭 Overview
@@ -99,6 +100,10 @@ Lazy reload telescope.nvim
     end,
 }
 ```
+
+# 🔎 Filtering with telescope.nvim
+
+To apply results of a filter press `<cr>` in insert mode.
 
 # 🗒️ Available commands
 
