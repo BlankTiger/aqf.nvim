@@ -7,13 +7,15 @@ Table of Contents                                      *aqf-table-of-contents*
 2. Requirements                                             |aqf-requirements|
 3. Installation                                             |aqf-installation|
 4. Configuration options                           |aqf-configuration-options|
-5. Available commands                                 |aqf-available-commands|
+5. Filtering with telescope.nvim           |aqf-filtering-with-telescope.nvim|
+6. Available commands                                 |aqf-available-commands|
 #aqf.nvim **Tableof Contents**
 
 - |aqf-overview|
 - |aqf-requirements|
 - |aqf-installation|
 - |aqf-configuration-options|
+- |aqf-filtering-with-telescope.nvim|
 - |aqf-available-commands|
 
 
@@ -124,7 +126,13 @@ Following is the default configuration:
 
 
 ==============================================================================
-5. Available commands                                 *aqf-available-commands*
+5. Filtering with telescope.nvim           *aqf-filtering-with-telescope.nvim*
+
+To apply results of a filter press `<cr>` in insert mode.
+
+
+==============================================================================
+6. Available commands                                 *aqf-available-commands*
 
 >lua
     local aqf = require("aqf")
