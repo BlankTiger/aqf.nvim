@@ -5,6 +5,7 @@ M.config = {
     windowed = false,
     quit_after_apply = false,
     save_when_selecting_from_history = true,
+    show_instructions = true,
     prev_qflists_limit = 9,
     win_height = 50,
     win_width = 180,
@@ -180,24 +181,29 @@ local function _get_cursor_pos()
     return curpos[2], curpos[3]
 end
 
+---@param bufnr integer
+---@param sep_line string | nil
 local function _save_qf_from_current_editing_window(bufnr, sep_line)
     local buf_content = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    local qflist = {}
     local qflist_str = ""
-    local found_sep_line = false
-    for _, v in pairs(buf_content) do
-        if v:find(sep_line, nil, true) then
-            found_sep_line = true
-            goto continue
-        end
-        if not found_sep_line then
-            goto continue
-        end
+    if sep_line then
+        local found_sep_line = false
+        for _, v in pairs(buf_content) do
+            if v:find(sep_line, nil, true) then
+                found_sep_line = true
+                goto continue
+            end
+            if not found_sep_line then
+                goto continue
+            end
 
-        table.insert(qflist, v)
-        qflist_str = qflist_str .. v .. "\n"
-
-        ::continue::
+            qflist_str = qflist_str .. v .. "\n"
+            ::continue::
+        end
+    else
+        for _, v in pairs(buf_content) do
+            qflist_str = qflist_str .. v .. "\n"
+        end
     end
     if qflist_str:find("\n", nil, true) then
         qflist_str = qflist_str:sub(1, -2)
@@ -342,22 +348,28 @@ local function _get_width()
 end
 
 local function _edit_qf(qf)
-    local lines = {
-        "<leader>n - filter by file names, <leader>c - filter by file content,",
-        "<leader>m - filter by match content, <leader>s - filter by previous search query,",
-        "<leader>r - refresh, <leader>a or <leader>w to apply changes, q - leave buffer",
-        "",
-        "You can also just edit the list under the separator",
-        "",
-        "Please don't remove/modify the separation line",
-    }
     local bufnr, win = _create_buf_and_win("aqf - editor")
-    for i, inst in pairs(lines) do
-        lines[i] = _cushion_to_center(inst, _get_width())
+    local lines = {}
+    local sep_line = nil
+    if M.config.show_instructions then
+        lines = {
+            "",
+            "<leader>n - filter by file names, <leader>c - filter by file content,",
+            "<leader>m - filter by match content, <leader>s - filter by previous search query,",
+            "<leader>r - refresh, <leader>a or <leader>w to apply changes, q - leave buffer,",
+            "<leader>i - toggle instructions",
+            "",
+            "You can also just edit the list under the separator",
+            "",
+            "Please don't remove/modify the separation line",
+        }
+        for i, inst in pairs(lines) do
+            lines[i] = _cushion_to_center(inst, _get_width())
+        end
+        local sep = "-"
+        sep_line = sep:rep(_get_width())
+        table.insert(lines, sep_line)
     end
-    local sep = "-"
-    local sep_line = sep:rep(_get_width())
-    table.insert(lines, sep_line)
 
     local file_list = _create_file_list(qf)
     vim.g.__aqf_file_lines = _lineify_file_list(file_list, nil)
@@ -366,7 +378,8 @@ local function _edit_qf(qf)
         table.insert(lines, v)
     end
 
-    vim.api.nvim_put(lines, "l", true, true)
+    vim.api.nvim_put(lines, "l", false, true)
+    vim.api.nvim_del_current_line()
 
     local keymap_opts = { noremap = true, buffer = bufnr, nowait = true }
 
@@ -402,6 +415,11 @@ local function _edit_qf(qf)
         M.edit_curr_qf()
         vim.fn.cursor(lnum, col)
     end
+
+    vim.keymap.set("n", "<leader>i", function()
+        M.config.show_instructions = not M.config.show_instructions
+        refresh()
+    end, keymap_opts)
 
     vim.keymap.set("n", "<leader>s", function()
         filter_qf_by_query(true)
@@ -469,20 +487,23 @@ local function _summarize_qf(qf)
 end
 
 function M.show_saved_qf_lists()
-    local instructions = {
-        "",
-        "q - leave the buffer, <cr> - open quickfix list under cursor for editing",
-        "<leader>s - set quickfix under cursor as current quickfix, <leader>r - refresh",
-        "<leader>d - remove quickfix under cursor",
-        "",
-        "Please don't remove/modify the separation line",
-    }
     local bufnr, win = _create_buf_and_win("aqf - history")
-    for i, inst in pairs(instructions) do
-        instructions[i] = _cushion_to_center(inst, _get_width())
+    local instructions = {}
+    if M.config.show_instructions then
+        instructions = {
+            "",
+            "q - leave the buffer, <cr> - open quickfix list under cursor for editing",
+            "<leader>s - set quickfix under cursor as current quickfix, <leader>r - refresh",
+            "<leader>d - remove quickfix under cursor, <leader>i - toggle instructions",
+            "",
+            "Please don't remove/modify the separation line",
+        }
+        for i, inst in pairs(instructions) do
+            instructions[i] = _cushion_to_center(inst, _get_width())
+        end
+        local sep = "-"
+        table.insert(instructions, sep:rep(_get_width()))
     end
-    local sep = "-"
-    table.insert(instructions, sep:rep(_get_width()))
 
     local qflists = M.__prev_qflists
     local qflists_strs = instructions
@@ -526,6 +547,11 @@ function M.show_saved_qf_lists()
         M.show_saved_qf_lists()
         vim.fn.cursor(lnum, col)
     end
+
+    vim.keymap.set("n", "<leader>i", function()
+        M.config.show_instructions = not M.config.show_instructions
+        refresh()
+    end, keymap_opts)
 
     vim.keymap.set("n", "<leader>s", function()
         local chosen_qf = get_chosen_qf_idx()

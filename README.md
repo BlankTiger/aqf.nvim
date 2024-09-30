@@ -76,6 +76,8 @@ local opts = {
     quit_after_apply = false,
     -- selecting from history saves current quickfix list to history as the most recent entry
     save_when_selecting_from_history = true,
+    -- show instructions at the top of quickfix editing buffers, toggle with `<leader>i`
+    show_instructions = true,
     -- amount of quickfix windows kept in quickfix history
     prev_qflists_limit = 9,
     -- height of a window if `windowed = true`
