@@ -254,7 +254,7 @@ local function _apply_filter_by_name_results_via_autocmd(aqf_bufnr, file_list, p
                 table.insert(new_lines, v)
             end
             vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, {})
-            vim.api.nvim_buf_set_lines(aqf_bufnr, 1, -1, false, new_lines)
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, new_lines)
         end,
     })
 end
@@ -277,7 +277,7 @@ local function _apply_filter_by_file_content_results_via_autocmd(aqf_bufnr, pref
                 table.insert(new_lines, v)
             end
             vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, {})
-            vim.api.nvim_buf_set_lines(aqf_bufnr, 1, -1, false, new_lines)
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, new_lines)
         end,
     })
 end
@@ -306,7 +306,7 @@ local function _apply_filter_by_match_content_results_via_autocmd(
                 table.insert(new_lines, v)
             end
             vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, {})
-            vim.api.nvim_buf_set_lines(aqf_bufnr, 1, -1, false, new_lines)
+            vim.api.nvim_buf_set_lines(aqf_bufnr, 0, -1, false, new_lines)
         end,
     })
 end
