@@ -76,6 +76,9 @@ local opts = {
     save_when_selecting_from_history = true,
     -- show instructions at the top of quickfix editing buffers, toggle with `<leader>i`
     show_instructions = true,
+    -- use newest cached qflist for currently open project and set it as
+    -- current qflist during aqf.nvim setup
+    use_newest_cached_qflist = true,
     -- amount of quickfix windows kept in quickfix history
     prev_qflists_limit = 9,
     -- height of a window if `windowed = true`

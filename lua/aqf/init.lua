@@ -1,3 +1,5 @@
+local fs = require("aqf.fs")
+
 local M = {}
 
 -- default config
@@ -6,6 +8,7 @@ M.config = {
     quit_after_apply = false,
     save_when_selecting_from_history = true,
     show_instructions = true,
+    use_newest_cached_qflist = true,
     prev_qflists_limit = 9,
     win_height = 50,
     win_width = 180,
@@ -34,8 +37,21 @@ Lazy reload telescope.nvim
 function M.setup(opts)
     local config = vim.tbl_deep_extend("keep", opts or {}, M.config)
     M.config = config
-    M.__prev_qflists = {}
     M.__curr_idx_in_history = 0
+    M.__data_path = vim.fn.stdpath("data") .. "/aqf"
+    M.__cache_path = M.__data_path .. "/project_qflists.json"
+    fs.mkdir(M.__data_path)
+    M.__prev_qflists = {}
+    if fs.exists(M.__cache_path) then
+        local qflists = M._get_qflists_from_cache_for_curr_project()
+        if M.config.use_newest_cached_qflist and qflists[1] then
+            vim.fn.setqflist(qflists[1])
+        end
+        M.__prev_qflists = qflists
+    else
+        local content = vim.fn.json_encode({projects = {}})
+        fs.write(M.__cache_path, content, "w")
+    end
 
     -- TODO: add autocmd actions to update win_height and win_width if window size changes when running fullscreen
 
@@ -156,7 +172,7 @@ local function _create_file_list(qf)
         local _col = v["col"]
         local _lnum = v["lnum"]
         local text = v["text"]
-        local filename = vim.api.nvim_buf_get_name(_bufnr)
+        local filename = v["filename"] or vim.api.nvim_buf_get_name(_bufnr)
         local entry = _create_entry(filename, text, _bufnr, _col, _lnum)
         table.insert(file_list, entry)
     end
@@ -439,8 +455,17 @@ function M.edit_curr_qf()
     _edit_qf(qf)
 end
 
+function M._attach_filenames(qflist)
+    local new_qflist = {}
+    for i, entry in pairs(qflist) do
+        entry["filename"] = vim.api.nvim_buf_get_name(entry["bufnr"])
+        new_qflist[i] = entry
+    end
+    return new_qflist
+end
+
 function M.save_qf()
-    local curr_qflist = vim.fn.getqflist()
+    local curr_qflist = M._attach_filenames(vim.fn.getqflist())
     local qflists = M.__prev_qflists
     local len_qfs = #qflists
     if len_qfs > M.config.prev_qflists_limit then
@@ -449,6 +474,50 @@ function M.save_qf()
     table.insert(qflists, 1, curr_qflist)
     M.__prev_qflists = qflists
     M.__curr_idx_in_history = 0
+    M._cache_qflists()
+end
+
+local function get_project_key()
+    return vim.loop.cwd()
+end
+
+function M._cache_qflists()
+    local proj_key = get_project_key()
+    local ok, cache = pcall(vim.json.decode, fs.read(M.__cache_path))
+    if not ok then
+        vim.notify("Wasnt able to json decode content of per project qflists cache: " .. M.__cache_path, vim.log.levels.ERROR)
+        return
+    end
+    cache["projects"][proj_key] = M.__prev_qflists
+    local cache_content = vim.fn.json_encode(cache)
+    fs.write(M.__cache_path, cache_content, "w")
+end
+
+function M._remove_bufnrs_from_qflist(qflist)
+    local new_qflist = {}
+    for i, entry in pairs(qflist) do
+        entry["bufnr"] = nil
+        new_qflist[i] = entry
+    end
+    return new_qflist
+end
+
+function M._get_qflists_from_cache_for_curr_project()
+    local proj_key = get_project_key()
+    local ok, cache = pcall(vim.json.decode, fs.read(M.__cache_path))
+    if not ok then
+        vim.notify("Wasnt able to json decode content of per project qflists cache: " .. M.__cache_path, vim.log.levels.ERROR)
+        return {}
+    end
+    local qflists = cache["projects"][proj_key]
+    if not qflists then
+        return {}
+    end
+
+    for i, qflist in pairs(qflists) do
+        qflists[i] = M._remove_bufnrs_from_qflist(qflist)
+    end
+    return qflists
 end
 
 function M.prev_qf()
@@ -571,6 +640,7 @@ function M.show_saved_qf_lists()
         local chosen_qf = get_chosen_qf_idx()
         table.remove(qflists, chosen_qf)
         M.__prev_qflists = qflists
+        M._cache_qflists()
         refresh()
     end, keymap_opts)
 
