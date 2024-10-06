@@ -628,7 +628,7 @@ function M.show_saved_qf_lists()
             M.save_qf()
             refresh()
         end
-        local qf = qflists[chosen_qf]
+        local qf = M.__prev_qflists[chosen_qf]
         vim.fn.setqflist(qf)
     end, keymap_opts)
 
