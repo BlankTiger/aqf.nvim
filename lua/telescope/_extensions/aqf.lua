@@ -8,25 +8,19 @@ local make_entry = require("telescope.make_entry")
 local finders = require("telescope.finders")
 local pickers = require("telescope.pickers")
 local sorters = require("telescope.sorters")
-local state = require("telescope.actions.state")
 local utils = require("telescope.actions.utils")
 local conf = require("telescope.config").values
-local plenary = require("plenary")
-local Path = require("plenary.path")
-local with = plenary.context_manager.with
-local open = plenary.context_manager.open
+local fs = require("aqf.fs")
 
 local default_opts = {}
 local _data_path = vim.fn.stdpath("data")
 local data_path = _data_path .. "/aqf"
-Path:new(data_path):mkdir()
+fs.mkdir(data_path)
 
 local aqf_tmp_filenames_path = data_path .. "/aqf_tmp_filenames"
 local aqf_tmp_matches_path = data_path .. "/aqf_tmp_matches"
-local aqf_tmp_filenames = Path:new(aqf_tmp_filenames_path)
-local aqf_tmp_matches = Path:new(aqf_tmp_matches_path)
-aqf_tmp_filenames:write("", "w")
-aqf_tmp_matches:write("", "w")
+fs.write(aqf_tmp_filenames_path, "", "w")
+fs.write(aqf_tmp_matches_path, "", "w")
 
 local function split(command)
     local cmd_split = {}
@@ -83,7 +77,7 @@ local function by_name(opts)
         ::continue::
     end
 
-    aqf_tmp_filenames:write(filtered_qf_str, "w")
+    fs.write(aqf_tmp_filenames_path, filtered_qf_str, "w")
     local live_grepper = finders.new_job(function(prompt)
         if not prompt or prompt == "" then
             return nil
@@ -209,7 +203,7 @@ local function by_match_content(opts)
         -- ::continue::
     end
 
-    aqf_tmp_matches:write(filtered_qf_str, "w")
+    fs.write(aqf_tmp_matches_path, filtered_qf_str, "w")
     local live_grepper = finders.new_job(function(prompt)
         if not prompt or prompt == "" then
             return nil

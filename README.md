@@ -26,7 +26,6 @@ https://github.com/user-attachments/assets/0e79c371-5fee-4b8d-b9ae-1083d33ceea1
 - If you want to use all the additional filtering features, then you have to have the following conditions met:
     + [ripgrep](https://github.com/BurntSushi/ripgrep) installed,
     + [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim) installed,
-    + [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) installed.
 
 # 🧰 Installation
 
@@ -57,7 +56,6 @@ If you want all filtering features:
         telescope.load_extension("aqf")
     end,
     dependencies = {
-        "nvim-lua/plenary.nvim",
         "nvim-telescope/telescope.nvim",
     }
 }
