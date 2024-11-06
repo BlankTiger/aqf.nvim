@@ -227,6 +227,7 @@ local function _save_qf_from_current_editing_window(bufnr, sep_line)
 
     M.save_qf()
     vim.api.nvim_command("cexpr []")
+    qflist_str = qflist_str:gsub("'", "''")
     vim.api.nvim_command("caddexpr '" .. qflist_str .. "'")
 
     if M.config.quit_after_apply then
